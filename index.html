@@ -50,11 +50,16 @@
             text-align: left; border-left: 6px solid var(--orange-theme); box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        /* ตกแต่ง Admin User Card เพิ่มเติม */
         .admin-user-card {
             background: white; padding: 15px; margin: 10px 0; border-radius: 15px;
             display: flex; justify-content: space-between; align-items: center; border: 1px solid #ddd;
         }
+
+        .leaderboard-table {
+            width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #fff; border-radius: 10px; overflow: hidden; font-size: 0.9rem;
+        }
+        .leaderboard-table th { background: var(--gold-accent); color: white; padding: 10px; }
+        .leaderboard-table td { padding: 10px; border-bottom: 1px solid #eee; }
 
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -88,7 +93,19 @@
     </div>
 
     <div id="admin-section" style="display: none;">
-        <h2 style="color:var(--navy-blue)">แผงควบคุม Admin</h2>
+        <h2 style="color:var(--navy-blue); margin-bottom: 5px;">Admin Dashboard</h2>
+        
+        <div style="margin: 15px 0; padding: 10px; background: #f0f0f0; border-radius: 15px;">
+            <h4 style="margin: 0 0 10px 0; color: var(--navy-blue);">🏆 ตารางจัดอันดับ</h4>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr><th>ที่</th><th>ชื่อ</th><th>จำนวน</th></tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+            </table>
+        </div>
+
+        <h4 style="text-align: left; margin: 20px 0 10px 0;">👥 รายชื่อทั้งหมด</h4>
         <div id="all-users-list"></div>
         <button onclick="location.reload()" style="background:#666; color:white; margin-top:20px;">ออกจากระบบ</button>
     </div>
@@ -168,10 +185,7 @@
             item.innerHTML = `
                 <div style="font-size:0.9rem; color:var(--orange-theme); font-weight:bold;">คนที่ ${index+1}</div>
                 <div style="font-size:1.1rem; font-weight:800; color:var(--navy-blue);">${s.name} (${s.nickname})</div>
-                <div style="font-size:0.85rem; color:#666; margin-top:5px;">
-                    รุ่น: CE${s.batch} | โทร: ${s.phone}<br>
-                    บริษัท: ${s.work}
-                </div>
+                <div style="font-size:0.85rem; color:#666; margin-top:5px;">รุ่น: CE${s.batch} | โทร: ${s.phone}<br>บริษัท: ${s.work}</div>
             `;
             listDiv.appendChild(item);
         });
@@ -196,31 +210,22 @@
         btn.innerText = "กำลังบันทึก...";
 
         const newSenior = {
-            name: sName,
-            nickname: sNickname || "-",
-            batch: sBatch || "-",
-            phone: sPhone || "-",
-            work: sWork || "-",
-            intern: sIntern || "-"
+            name: sName, nickname: sNickname || "-", batch: sBatch || "-",
+            phone: sPhone || "-", work: sWork || "-", intern: sIntern || "-"
         };
 
         const updatedSeniors = [...mySeniors, newSenior];
 
         db.ref('users/' + currentUser).set({
-            name: currentUser,
-            batch: currentBatch,
-            seniors: updatedSeniors,
-            count: updatedSeniors.length
+            name: currentUser, batch: currentBatch,
+            seniors: updatedSeniors, count: updatedSeniors.length
         }).then(() => {
             alert("บันทึกข้อมูลรุ่นพี่สำเร็จ!");
             closeForm();
             document.querySelectorAll('#formModal input, #formModal textarea').forEach(el => el.value = "");
-            btn.disabled = false;
-            btn.innerText = "💾 บันทึกข้อมูล";
+            btn.disabled = false; btn.innerText = "💾 บันทึกข้อมูล";
         });
     }
-
-    // --- ส่วนของ Admin ที่เพิ่มปุ่มลบ ---
 
     function showAdmin() {
         document.getElementById('login-section').style.display = 'none';
@@ -228,11 +233,31 @@
 
         db.ref('users').on('value', (snapshot) => {
             const listDiv = document.getElementById('all-users-list');
+            const leaderboardBody = document.getElementById('leaderboard-body');
             listDiv.innerHTML = "";
+            leaderboardBody.innerHTML = "";
+            
             if(!snapshot.exists()) return listDiv.innerHTML = "<p>ยังไม่มีใครลงทะเบียน</p>";
             
+            let allUsers = [];
             snapshot.forEach((child) => {
-                const user = child.val();
+                allUsers.push(child.val());
+            });
+
+            // จัดอันดับตามจำนวน (Leaderboard)
+            let sortedUsers = [...allUsers].sort((a, b) => (b.count || 0) - (a.count || 0));
+            sortedUsers.forEach((user, index) => {
+                let rankLabel = index + 1;
+                if(index === 0) rankLabel = "🥇";
+                if(index === 1) rankLabel = "🥈";
+                if(index === 2) rankLabel = "🥉";
+
+                const row = `<tr><td>${rankLabel}</td><td>${user.name}</td><td><b>${user.count || 0}</b></td></tr>`;
+                leaderboardBody.innerHTML += row;
+            });
+
+            // รายชื่อทั้งหมดข้างล่าง
+            allUsers.forEach((user) => {
                 const card = document.createElement('div');
                 card.className = 'admin-user-card';
                 card.innerHTML = `
@@ -250,31 +275,25 @@
         });
     }
 
-    // ฟังก์ชันลบ User ทั้งหมด
     function deleteUser(userName) {
         if(confirm(`ยืนยันการลบข้อมูลของ "${userName}" ทั้งหมดหรือไม่?`)) {
-            db.ref('users/' + userName).remove()
-            .then(() => alert("ลบ User เรียบร้อยแล้ว"));
+            db.ref('users/' + userName).remove().then(() => alert("ลบ User เรียบร้อยแล้ว"));
         }
     }
 
-    // ฟังก์ชันดูรายละเอียด และลบเฉพาะบางคน
     function viewDetails(userName) {
         db.ref('users/' + userName).once('value', (snapshot) => {
             const user = snapshot.val();
             if(!user || !user.seniors) return alert("ไม่พบข้อมูล");
-            
             document.getElementById('admin-view-title').innerText = "ข้อมูลของ " + userName;
             const contentDiv = document.getElementById('admin-view-content');
             contentDiv.innerHTML = "";
-
             user.seniors.forEach((s, i) => {
                 const item = document.createElement('div');
                 item.style.cssText = "border-bottom:1px solid #eee; padding:10px 0; position:relative;";
                 item.innerHTML = `
                     <b>คนที่ ${i+1}: ${s.name} (CE${s.batch})</b><br>
-                    <small>เบอร์: ${s.phone} | ทำงาน: ${s.work}</small><br>
-                    <small style="color:blue">ฝึกงาน: ${s.intern}</small>
+                    <small>เบอร์: ${s.phone} | ทำงาน: ${s.work}</small>
                     <button onclick="deleteSeniorRow('${userName}', ${i})" style="position:absolute; right:0; top:10px; background:red; color:white; border-radius:5px; font-size:10px; padding:3px 8px;">ลบคนนี้</button>
                 `;
                 contentDiv.appendChild(item);
@@ -283,20 +302,15 @@
         });
     }
 
-    // ฟังก์ชันลบรุ่นพี่เฉพาะรายชื่อที่เลือก
     function deleteSeniorRow(userName, index) {
         if(confirm("ต้องการลบข้อมูลรุ่นพี่คนนี้ใช่หรือไม่?")) {
             db.ref('users/' + userName).once('value', (snapshot) => {
                 const user = snapshot.val();
                 let seniors = user.seniors;
-                seniors.splice(index, 1); // ลบอาเรย์ตำแหน่งที่เลือกออก
-                
-                db.ref('users/' + userName).update({
-                    seniors: seniors,
-                    count: seniors.length
-                }).then(() => {
+                seniors.splice(index, 1);
+                db.ref('users/' + userName).update({ seniors: seniors, count: seniors.length }).then(() => {
                     alert("ลบข้อมูลรุ่นพี่เรียบร้อย");
-                    closeAdminModal(); // ปิดเพื่อรีเฟรชข้อมูลใหม่
+                    closeAdminModal();
                 });
             });
         }
@@ -304,3 +318,4 @@
 </script>
 </body>
 </html>
+
