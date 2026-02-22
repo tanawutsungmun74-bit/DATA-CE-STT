@@ -14,6 +14,7 @@
             --gold-accent: #d4af37; 
             --success-color: #28a745;
             --orange-theme: #f39c12;
+            --danger-red: #dc3545;
         }
 
         body {
@@ -49,6 +50,7 @@
             text-align: left; border-left: 6px solid var(--orange-theme); box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
+        /* ตกแต่ง Admin User Card เพิ่มเติม */
         .admin-user-card {
             background: white; padding: 15px; margin: 10px 0; border-radius: 15px;
             display: flex; justify-content: space-between; align-items: center; border: 1px solid #ddd;
@@ -58,6 +60,8 @@
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; padding: 10px;
         }
+
+        .admin-del-btn { background: var(--danger-red); color: white; padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; margin-left: 5px; }
     </style>
 </head>
 <body>
@@ -104,8 +108,15 @@
     </div>
 </div>
 
+<div id="adminDetailModal" class="modal">
+    <div style="background:white; padding:20px; border-radius:20px; width:100%; max-width:400px; max-height: 80vh; overflow-y: auto; text-align: left;">
+        <h3 id="admin-view-title" style="color:var(--navy-blue); margin-top:0;">รายละเอียด</h3>
+        <div id="admin-view-content"></div>
+        <button onclick="closeAdminModal()" style="background:var(--navy-blue); color:white; width:100%; margin-top:15px;">ปิดหน้าต่าง</button>
+    </div>
+</div>
+
 <script>
-    // Firebase Config เดิมของคุณ
     const firebaseConfig = {
         apiKey: "AIzaSyAId-pF0U0hUe6hOxBf5SZu4sBObk2FIIc",
         authDomain: "binggocivil.firebaseapp.com",
@@ -126,9 +137,7 @@
     function login() {
         const nameInput = document.getElementById('login-name').value.trim();
         const batchInput = document.getElementById('login-batch').value.trim();
-        
         if (!nameInput) return alert("กรุณาใส่ชื่อ!");
-
         if (nameInput === "meeting41civil") {
             showAdmin();
         } else {
@@ -143,11 +152,8 @@
         document.getElementById('login-section').style.display = 'none';
         document.getElementById('user-section').style.display = 'block';
         document.getElementById('display-name').innerText = currentUser + " (รุ่น " + currentBatch + ")";
-        
-        // ใช้ .on เพื่อให้หน้าจออัปเดตอัตโนมัติเมื่อข้อมูลใน Firebase เปลี่ยน
         db.ref('users/' + currentUser).on('value', (snapshot) => {
             const data = snapshot.val();
-            // ตรวจสอบว่ามีข้อมูลรุ่นพี่ไหม ถ้าไม่มีให้เป็นอาเรย์ว่าง
             mySeniors = (data && data.seniors) ? data.seniors : [];
             renderList();
         });
@@ -156,7 +162,6 @@
     function renderList() {
         const listDiv = document.getElementById('senior-list');
         listDiv.innerHTML = "";
-        
         mySeniors.forEach((s, index) => {
             const item = document.createElement('div');
             item.className = 'list-item';
@@ -170,18 +175,12 @@
             `;
             listDiv.appendChild(item);
         });
-        
-        // อัปเดตตัวเลขปุ่มสำหรับคนถัดไป
         document.getElementById('next-num').innerText = mySeniors.length + 1;
     }
 
-    function showForm() {
-        document.getElementById('formModal').style.display = 'flex';
-    }
-
-    function closeForm() {
-        document.getElementById('formModal').style.display = 'none';
-    }
+    function showForm() { document.getElementById('formModal').style.display = 'flex'; }
+    function closeForm() { document.getElementById('formModal').style.display = 'none'; }
+    function closeAdminModal() { document.getElementById('adminDetailModal').style.display = 'none'; }
 
     function saveData() {
         const sName = document.getElementById('s-name').value.trim();
@@ -192,8 +191,6 @@
         const sIntern = document.getElementById('s-intern').value.trim();
 
         if(!sName) return alert("กรุณากรอกชื่อรุ่นพี่");
-
-        // ปิดปุ่มชั่วคราวป้องกันการกดซ้ำ
         const btn = document.getElementById('save-btn');
         btn.disabled = true;
         btn.innerText = "กำลังบันทึก...";
@@ -207,28 +204,23 @@
             intern: sIntern || "-"
         };
 
-        // สร้างอาเรย์ใหม่โดยรวมอันเก่าและอันใหม่
         const updatedSeniors = [...mySeniors, newSenior];
 
-        // บันทึกลง Firebase
         db.ref('users/' + currentUser).set({
             name: currentUser,
             batch: currentBatch,
             seniors: updatedSeniors,
             count: updatedSeniors.length
         }).then(() => {
-            alert("บันทึกข้อมูลรุ่นพี่คนที่ " + updatedSeniors.length + " สำเร็จ!");
+            alert("บันทึกข้อมูลรุ่นพี่สำเร็จ!");
             closeForm();
-            // ล้างข้อมูลในฟอร์ม
             document.querySelectorAll('#formModal input, #formModal textarea').forEach(el => el.value = "");
-            btn.disabled = false;
-            btn.innerText = "💾 บันทึกข้อมูล";
-        }).catch((err) => {
-            alert("บันทึกไม่สำเร็จ: " + err.message);
             btn.disabled = false;
             btn.innerText = "💾 บันทึกข้อมูล";
         });
     }
+
+    // --- ส่วนของ Admin ที่เพิ่มปุ่มลบ ---
 
     function showAdmin() {
         document.getElementById('login-section').style.display = 'none';
@@ -237,10 +229,8 @@
         db.ref('users').on('value', (snapshot) => {
             const listDiv = document.getElementById('all-users-list');
             listDiv.innerHTML = "";
-            if(!snapshot.exists()) {
-                listDiv.innerHTML = "<p style='color:#999'>ยังไม่มีใครลงทะเบียน</p>";
-                return;
-            }
+            if(!snapshot.exists()) return listDiv.innerHTML = "<p>ยังไม่มีใครลงทะเบียน</p>";
+            
             snapshot.forEach((child) => {
                 const user = child.val();
                 const card = document.createElement('div');
@@ -250,29 +240,66 @@
                         <b style="color:var(--navy-blue)">${user.name} (CE${user.batch})</b><br>
                         <small style="color:var(--success-color)">รวบรวมได้: ${user.count || 0} คน</small>
                     </div>
-                    <button onclick="viewDetails('${user.name}')" style="background:var(--navy-blue); color:white; border-radius:8px; font-size:0.8rem;">เปิดดู</button>
+                    <div>
+                        <button onclick="viewDetails('${user.name}')" style="background:var(--navy-blue); color:white; border-radius:8px; font-size:0.8rem; padding: 8px;">เปิดดู</button>
+                        <button onclick="deleteUser('${user.name}')" class="admin-del-btn">ลบ User</button>
+                    </div>
                 `;
                 listDiv.appendChild(card);
             });
         });
     }
 
+    // ฟังก์ชันลบ User ทั้งหมด
+    function deleteUser(userName) {
+        if(confirm(`ยืนยันการลบข้อมูลของ "${userName}" ทั้งหมดหรือไม่?`)) {
+            db.ref('users/' + userName).remove()
+            .then(() => alert("ลบ User เรียบร้อยแล้ว"));
+        }
+    }
+
+    // ฟังก์ชันดูรายละเอียด และลบเฉพาะบางคน
     function viewDetails(userName) {
         db.ref('users/' + userName).once('value', (snapshot) => {
             const user = snapshot.val();
             if(!user || !user.seniors) return alert("ไม่พบข้อมูล");
             
-            let text = "📋 ข้อมูลจากรุ่นน้อง: " + userName + " (CE" + user.batch + ")\n";
-            text += "------------------------------\n";
+            document.getElementById('admin-view-title').innerText = "ข้อมูลของ " + userName;
+            const contentDiv = document.getElementById('admin-view-content');
+            contentDiv.innerHTML = "";
+
             user.seniors.forEach((s, i) => {
-                text += `คนที่ ${i+1}: ${s.name} (${s.nickname})\n`;
-                text += `รุ่น: CE${s.batch} | โทร: ${s.phone}\n`;
-                text += `ที่ทำงาน: ${s.work}\n`;
-                text += `ฝึกงาน: ${s.intern}\n`;
-                text += `------------------------------\n`;
+                const item = document.createElement('div');
+                item.style.cssText = "border-bottom:1px solid #eee; padding:10px 0; position:relative;";
+                item.innerHTML = `
+                    <b>คนที่ ${i+1}: ${s.name} (CE${s.batch})</b><br>
+                    <small>เบอร์: ${s.phone} | ทำงาน: ${s.work}</small><br>
+                    <small style="color:blue">ฝึกงาน: ${s.intern}</small>
+                    <button onclick="deleteSeniorRow('${userName}', ${i})" style="position:absolute; right:0; top:10px; background:red; color:white; border-radius:5px; font-size:10px; padding:3px 8px;">ลบคนนี้</button>
+                `;
+                contentDiv.appendChild(item);
             });
-            alert(text);
+            document.getElementById('adminDetailModal').style.display = 'flex';
         });
+    }
+
+    // ฟังก์ชันลบรุ่นพี่เฉพาะรายชื่อที่เลือก
+    function deleteSeniorRow(userName, index) {
+        if(confirm("ต้องการลบข้อมูลรุ่นพี่คนนี้ใช่หรือไม่?")) {
+            db.ref('users/' + userName).once('value', (snapshot) => {
+                const user = snapshot.val();
+                let seniors = user.seniors;
+                seniors.splice(index, 1); // ลบอาเรย์ตำแหน่งที่เลือกออก
+                
+                db.ref('users/' + userName).update({
+                    seniors: seniors,
+                    count: seniors.length
+                }).then(() => {
+                    alert("ลบข้อมูลรุ่นพี่เรียบร้อย");
+                    closeAdminModal(); // ปิดเพื่อรีเฟรชข้อมูลใหม่
+                });
+            });
+        }
     }
 </script>
 </body>
