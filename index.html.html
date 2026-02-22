@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Meeting 41 CE&STT - Quest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --navy-blue: #001a33; 
+            --gold-accent: #d4af37; 
+            --success-color: #28a745;
+            --orange-theme: #f39c12;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--navy-blue);
+            margin: 0; padding: 10px;
+            display: flex; justify-content: center; min-height: 100vh;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 25px; border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            width: 100%; max-width: 480px; text-align: center;
+            border: 3px solid var(--gold-accent);
+            height: fit-content; margin-top: 20px;
+        }
+
+        .header-section { margin-bottom: 20px; }
+        .main-title { font-size: 2rem; font-weight: 800; color: var(--gold-accent); margin: 0; line-height: 1.2; }
+
+        input[type="text"], input[type="tel"], textarea {
+            width: 90%; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 2px solid #ddd; font-family: 'Kanit'; font-size: 1rem;
+        }
+
+        button { padding: 12px 20px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-main { background: var(--navy-blue); color: white; width: 95%; font-size: 1.1rem; border: 1px solid var(--gold-accent); }
+        .btn-add { background: var(--orange-theme); color: white; width: 100%; font-size: 1.1rem; margin-top: 10px; }
+        .btn-save { background: var(--success-color); color: white; width: 100%; margin-top: 10px; }
+
+        .list-item {
+            background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 15px;
+            text-align: left; border-left: 6px solid var(--orange-theme); box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .admin-user-card {
+            background: white; padding: 15px; margin: 10px 0; border-radius: 15px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid #ddd;
+        }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-section">
+        <h1 class="main-title">CE&STT QUEST</h1>
+        <p style="color: var(--navy-blue); font-weight: bold;">ภารกิจบันทึกข้อมูลรุ่นพี่</p>
+    </div>
+
+    <hr style="border:0; border-top:2px solid var(--gold-accent); margin: 15px 0;">
+
+    <div id="login-section">
+        <input type="text" id="login-name" placeholder="ชื่อ-นามสกุล">
+        <input type="text" id="login-batch" placeholder="รุ่น (เช่น CE20)">
+        <button class="btn-main" onclick="login()">เข้าสู่ระบบ</button>
+    </div>
+
+    <div id="user-section" style="display: none;">
+        <h3 style="margin:0; color:var(--navy-blue)">คุณ: <span id="display-name" style="color:var(--orange-theme)"></span></h3>
+        <div id="senior-list" style="margin-top: 15px;"></div>
+        <button id="add-button" class="btn-add" onclick="showForm()">➕ บันทึกข้อมูลรุ่นพี่คนที่ <span id="next-num">1</span></button>
+        <button onclick="location.reload()" style="background:#ccc; margin-top:15px; font-size:0.8rem;">ออกจากระบบ</button>
+    </div>
+
+    <div id="admin-section" style="display: none;">
+        <h2 style="color:var(--navy-blue)">แผงควบคุม Admin</h2>
+        <div id="all-users-list"></div>
+        <button onclick="location.reload()" style="background:#666; color:white; margin-top:20px;">ออกจากระบบ</button>
+    </div>
+</div>
+
+<div id="formModal" class="modal">
+    <div style="background:white; padding:20px; border-radius:20px; width:100%; max-width:400px; max-height: 90vh; overflow-y: auto;">
+        <h3 id="form-title" style="color:var(--navy-blue); margin-top:0;">กรอกข้อมูลรุ่นพี่</h3>
+        <input type="text" id="s-name" placeholder="ชื่อ-นามสกุล รุ่นพี่">
+        <input type="text" id="s-nickname" placeholder="ชื่อเล่น">
+        <input type="text" id="s-batch" placeholder="รุ่น CE-STT">
+        <input type="tel" id="s-phone" placeholder="เบอร์โทรศัพท์">
+        <input type="text" id="s-work" placeholder="บริษัท / ที่ทำงาน">
+        <textarea id="s-intern" placeholder="ความต้องการรับเด็กฝึกงาน" rows="3"></textarea>
+        <button id="save-btn" class="btn-save" onclick="saveData()">💾 บันทึกข้อมูล</button>
+        <button onclick="closeForm()" style="background:#ccc; width:100%; margin-top:8px;">ยกเลิก</button>
+    </div>
+</div>
+
+<script>
+    // Firebase Config เดิมของคุณ
+    const firebaseConfig = {
+        apiKey: "AIzaSyAId-pF0U0hUe6hOxBf5SZu4sBObk2FIIc",
+        authDomain: "binggocivil.firebaseapp.com",
+        databaseURL: "https://binggocivil-default-rtdb.firebaseio.com",
+        projectId: "binggocivil",
+        storageBucket: "binggocivil.firebasestorage.app",
+        messagingSenderId: "615822572602",
+        appId: "1:615822572602:web:5207b9a09174d41daf0903"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    let currentUser = "";
+    let currentBatch = "";
+    let mySeniors = [];
+
+    function login() {
+        const nameInput = document.getElementById('login-name').value.trim();
+        const batchInput = document.getElementById('login-batch').value.trim();
+        
+        if (!nameInput) return alert("กรุณาใส่ชื่อ!");
+
+        if (nameInput === "meeting41civil") {
+            showAdmin();
+        } else {
+            if (!batchInput) return alert("กรุณาใส่รุ่น!");
+            currentUser = nameInput;
+            currentBatch = batchInput;
+            loadUserData();
+        }
+    }
+
+    function loadUserData() {
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('user-section').style.display = 'block';
+        document.getElementById('display-name').innerText = currentUser + " (รุ่น " + currentBatch + ")";
+        
+        // ใช้ .on เพื่อให้หน้าจออัปเดตอัตโนมัติเมื่อข้อมูลใน Firebase เปลี่ยน
+        db.ref('users/' + currentUser).on('value', (snapshot) => {
+            const data = snapshot.val();
+            // ตรวจสอบว่ามีข้อมูลรุ่นพี่ไหม ถ้าไม่มีให้เป็นอาเรย์ว่าง
+            mySeniors = (data && data.seniors) ? data.seniors : [];
+            renderList();
+        });
+    }
+
+    function renderList() {
+        const listDiv = document.getElementById('senior-list');
+        listDiv.innerHTML = "";
+        
+        mySeniors.forEach((s, index) => {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            item.innerHTML = `
+                <div style="font-size:0.9rem; color:var(--orange-theme); font-weight:bold;">คนที่ ${index+1}</div>
+                <div style="font-size:1.1rem; font-weight:800; color:var(--navy-blue);">${s.name} (${s.nickname})</div>
+                <div style="font-size:0.85rem; color:#666; margin-top:5px;">
+                    รุ่น: CE${s.batch} | โทร: ${s.phone}<br>
+                    บริษัท: ${s.work}
+                </div>
+            `;
+            listDiv.appendChild(item);
+        });
+        
+        // อัปเดตตัวเลขปุ่มสำหรับคนถัดไป
+        document.getElementById('next-num').innerText = mySeniors.length + 1;
+    }
+
+    function showForm() {
+        document.getElementById('formModal').style.display = 'flex';
+    }
+
+    function closeForm() {
+        document.getElementById('formModal').style.display = 'none';
+    }
+
+    function saveData() {
+        const sName = document.getElementById('s-name').value.trim();
+        const sNickname = document.getElementById('s-nickname').value.trim();
+        const sBatch = document.getElementById('s-batch').value.trim();
+        const sPhone = document.getElementById('s-phone').value.trim();
+        const sWork = document.getElementById('s-work').value.trim();
+        const sIntern = document.getElementById('s-intern').value.trim();
+
+        if(!sName) return alert("กรุณากรอกชื่อรุ่นพี่");
+
+        // ปิดปุ่มชั่วคราวป้องกันการกดซ้ำ
+        const btn = document.getElementById('save-btn');
+        btn.disabled = true;
+        btn.innerText = "กำลังบันทึก...";
+
+        const newSenior = {
+            name: sName,
+            nickname: sNickname || "-",
+            batch: sBatch || "-",
+            phone: sPhone || "-",
+            work: sWork || "-",
+            intern: sIntern || "-"
+        };
+
+        // สร้างอาเรย์ใหม่โดยรวมอันเก่าและอันใหม่
+        const updatedSeniors = [...mySeniors, newSenior];
+
+        // บันทึกลง Firebase
+        db.ref('users/' + currentUser).set({
+            name: currentUser,
+            batch: currentBatch,
+            seniors: updatedSeniors,
+            count: updatedSeniors.length
+        }).then(() => {
+            alert("บันทึกข้อมูลรุ่นพี่คนที่ " + updatedSeniors.length + " สำเร็จ!");
+            closeForm();
+            // ล้างข้อมูลในฟอร์ม
+            document.querySelectorAll('#formModal input, #formModal textarea').forEach(el => el.value = "");
+            btn.disabled = false;
+            btn.innerText = "💾 บันทึกข้อมูล";
+        }).catch((err) => {
+            alert("บันทึกไม่สำเร็จ: " + err.message);
+            btn.disabled = false;
+            btn.innerText = "💾 บันทึกข้อมูล";
+        });
+    }
+
+    function showAdmin() {
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('admin-section').style.display = 'block';
+
+        db.ref('users').on('value', (snapshot) => {
+            const listDiv = document.getElementById('all-users-list');
+            listDiv.innerHTML = "";
+            if(!snapshot.exists()) {
+                listDiv.innerHTML = "<p style='color:#999'>ยังไม่มีใครลงทะเบียน</p>";
+                return;
+            }
+            snapshot.forEach((child) => {
+                const user = child.val();
+                const card = document.createElement('div');
+                card.className = 'admin-user-card';
+                card.innerHTML = `
+                    <div style="text-align:left">
+                        <b style="color:var(--navy-blue)">${user.name} (CE${user.batch})</b><br>
+                        <small style="color:var(--success-color)">รวบรวมได้: ${user.count || 0} คน</small>
+                    </div>
+                    <button onclick="viewDetails('${user.name}')" style="background:var(--navy-blue); color:white; border-radius:8px; font-size:0.8rem;">เปิดดู</button>
+                `;
+                listDiv.appendChild(card);
+            });
+        });
+    }
+
+    function viewDetails(userName) {
+        db.ref('users/' + userName).once('value', (snapshot) => {
+            const user = snapshot.val();
+            if(!user || !user.seniors) return alert("ไม่พบข้อมูล");
+            
+            let text = "📋 ข้อมูลจากรุ่นน้อง: " + userName + " (CE" + user.batch + ")\n";
+            text += "------------------------------\n";
+            user.seniors.forEach((s, i) => {
+                text += `คนที่ ${i+1}: ${s.name} (${s.nickname})\n`;
+                text += `รุ่น: CE${s.batch} | โทร: ${s.phone}\n`;
+                text += `ที่ทำงาน: ${s.work}\n`;
+                text += `ฝึกงาน: ${s.intern}\n`;
+                text += `------------------------------\n`;
+            });
+            alert(text);
+        });
+    }
+</script>
+</body>
+</html>
