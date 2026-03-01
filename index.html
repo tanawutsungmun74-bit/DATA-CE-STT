@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         :root {
@@ -15,6 +16,7 @@
             --success-color: #28a745;
             --orange-theme: #f39c12;
             --danger-red: #dc3545;
+            --excel-green: #1d6f42;
         }
 
         body {
@@ -31,6 +33,7 @@
             width: 100%; max-width: 480px; text-align: center;
             border: 3px solid var(--gold-accent);
             height: fit-content; margin-top: 20px;
+            position: relative;
         }
 
         .header-section { margin-bottom: 20px; }
@@ -44,6 +47,13 @@
         .btn-main { background: var(--navy-blue); color: white; width: 95%; font-size: 1.1rem; border: 1px solid var(--gold-accent); }
         .btn-add { background: var(--orange-theme); color: white; width: 100%; font-size: 1.1rem; margin-top: 10px; }
         .btn-save { background: var(--success-color); color: white; width: 100%; margin-top: 10px; }
+        
+        .btn-excel-small { 
+            position: absolute; top: 15px; right: 15px;
+            background: var(--excel-green); color: white; 
+            padding: 5px 10px; font-size: 0.7rem; border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10;
+        }
 
         .list-item {
             background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 15px;
@@ -56,10 +66,10 @@
         }
 
         .leaderboard-table {
-            width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #fff; border-radius: 10px; overflow: hidden; font-size: 0.9rem;
+            width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #fff; border-radius: 10px; overflow: hidden; font-size: 0.8rem;
         }
-        .leaderboard-table th { background: var(--gold-accent); color: white; padding: 10px; }
-        .leaderboard-table td { padding: 10px; border-bottom: 1px solid #eee; }
+        .leaderboard-table th { background: var(--gold-accent); color: white; padding: 8px; }
+        .leaderboard-table td { padding: 8px; border-bottom: 1px solid #eee; }
 
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -67,11 +77,18 @@
         }
 
         .admin-del-btn { background: var(--danger-red); color: white; padding: 5px 10px; border-radius: 8px; font-size: 0.7rem; margin-left: 5px; }
+
+        /* สไตล์เพิ่มเติมสำหรับข้อมูลละเอียดใน Modal */
+        .detail-box { border-bottom: 2px solid #f0f0f0; padding: 15px 0; position: relative; }
+        .detail-row { margin-bottom: 4px; font-size: 0.95rem; border-left: 3px solid var(--gold-accent); padding-left: 10px; }
+        .detail-label { color: #666; font-weight: bold; font-size: 0.85rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <button id="excel-btn" class="btn-excel-small" style="display: none;" onclick="exportToExcel()">📊 Excel</button>
+
     <div class="header-section">
         <h1 class="main-title">CE&STT QUEST</h1>
         <p style="color: var(--navy-blue); font-weight: bold;">ภารกิจบันทึกข้อมูลผู้เข้าร่วมงาน</p>
@@ -88,24 +105,20 @@
     <div id="user-section" style="display: none;">
         <h3 style="margin:0; color:var(--navy-blue)">คุณ: <span id="display-name" style="color:var(--orange-theme)"></span></h3>
         <div id="senior-list" style="margin-top: 15px;"></div>
-        <button id="add-button" class="btn-add" onclick="showForm()">➕ บันทึกข้อมูลรุ่นพี่คนที่ <span id="next-num">1</span></button>
+        <button id="add-button" class="btn-add" onclick="showForm()">➕ บันทึกข้อมูลคนที่ <span id="next-num">1</span></button>
         <button onclick="location.reload()" style="background:#ccc; margin-top:15px; font-size:0.8rem;">ออกจากระบบ</button>
     </div>
 
     <div id="admin-section" style="display: none;">
         <h2 style="color:var(--navy-blue); margin-bottom: 5px;">Admin Dashboard</h2>
-        
         <div style="margin: 15px 0; padding: 10px; background: #f0f0f0; border-radius: 15px;">
             <h4 style="margin: 0 0 10px 0; color: var(--navy-blue);">🏆 ตารางจัดอันดับ</h4>
             <table class="leaderboard-table">
-                <thead>
-                    <tr><th>ที่</th><th>ชื่อ</th><th>จำนวน</th></tr>
-                </thead>
+                <thead><tr><th>ที่</th><th>ชื่อ</th><th>จำนวน</th></tr></thead>
                 <tbody id="leaderboard-body"></tbody>
             </table>
         </div>
-
-        <h4 style="text-align: left; margin: 20px 0 10px 0;">👥 รายชื่อทั้งหมด</h4>
+        <h4 style="text-align: left; margin: 20px 0 10px 0;">👥 รายชื่อผู้กรอก</h4>
         <div id="all-users-list"></div>
         <button onclick="location.reload()" style="background:#666; color:white; margin-top:20px;">ออกจากระบบ</button>
     </div>
@@ -113,8 +126,8 @@
 
 <div id="formModal" class="modal">
     <div style="background:white; padding:20px; border-radius:20px; width:100%; max-width:400px; max-height: 90vh; overflow-y: auto;">
-        <h3 id="form-title" style="color:var(--navy-blue); margin-top:0;">กรอกข้อมูลรุ่นพี่</h3>
-        <input type="text" id="s-name" placeholder="ชื่อ-นามสกุล รุ่นพี่">
+        <h3 style="color:var(--navy-blue); margin-top:0;">กรอกข้อมูลผู้เข้าร่วมงาน</h3>
+        <input type="text" id="s-name" placeholder="ชื่อ-นามสกุล">
         <input type="text" id="s-nickname" placeholder="ชื่อเล่น">
         <input type="text" id="s-batch" placeholder="รุ่น CE-STT">
         <input type="tel" id="s-phone" placeholder="เบอร์โทรศัพท์">
@@ -127,9 +140,9 @@
 
 <div id="adminDetailModal" class="modal">
     <div style="background:white; padding:20px; border-radius:20px; width:100%; max-width:400px; max-height: 80vh; overflow-y: auto; text-align: left;">
-        <h3 id="admin-view-title" style="color:var(--navy-blue); margin-top:0;">รายละเอียด</h3>
+        <h3 id="admin-view-title" style="color:var(--navy-blue); margin-top:0; border-bottom: 2px solid var(--gold-accent); padding-bottom: 10px;">รายละเอียด</h3>
         <div id="admin-view-content"></div>
-        <button onclick="closeAdminModal()" style="background:var(--navy-blue); color:white; width:100%; margin-top:15px;">ปิดหน้าต่าง</button>
+        <button onclick="closeAdminModal()" style="background:var(--navy-blue); color:white; width:100%; margin-top:15px; border-radius: 10px; width: 100%;">ปิดหน้าต่าง</button>
     </div>
 </div>
 
@@ -146,23 +159,14 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    
-    let currentUser = "";
-    let currentBatch = "";
-    let mySeniors = [];
+    let currentUser = ""; let currentBatch = ""; let mySeniors = [];
 
     function login() {
         const nameInput = document.getElementById('login-name').value.trim();
         const batchInput = document.getElementById('login-batch').value.trim();
         if (!nameInput) return alert("กรุณาใส่ชื่อ!");
-        if (nameInput === "meeting41civil") {
-            showAdmin();
-        } else {
-            if (!batchInput) return alert("กรุณาใส่รุ่น!");
-            currentUser = nameInput;
-            currentBatch = batchInput;
-            loadUserData();
-        }
+        if (nameInput === "meeting41civil") { showAdmin(); } 
+        else { if (!batchInput) return alert("กรุณาใส่รุ่น!"); currentUser = nameInput; currentBatch = batchInput; loadUserData(); }
     }
 
     function loadUserData() {
@@ -180,14 +184,7 @@
         const listDiv = document.getElementById('senior-list');
         listDiv.innerHTML = "";
         mySeniors.forEach((s, index) => {
-            const item = document.createElement('div');
-            item.className = 'list-item';
-            item.innerHTML = `
-                <div style="font-size:0.9rem; color:var(--orange-theme); font-weight:bold;">คนที่ ${index+1}</div>
-                <div style="font-size:1.1rem; font-weight:800; color:var(--navy-blue);">${s.name} (${s.nickname})</div>
-                <div style="font-size:0.85rem; color:#666; margin-top:5px;">รุ่น: CE${s.batch} | โทร: ${s.phone}<br>บริษัท: ${s.work}</div>
-            `;
-            listDiv.appendChild(item);
+            listDiv.innerHTML += `<div class="list-item"><b>${index+1}. ${s.name}</b><br><small>CE${s.batch} | ${s.work}</small></div>`;
         });
         document.getElementById('next-num').innerText = mySeniors.length + 1;
     }
@@ -198,30 +195,23 @@
 
     function saveData() {
         const sName = document.getElementById('s-name').value.trim();
-        const sNickname = document.getElementById('s-nickname').value.trim();
-        const sBatch = document.getElementById('s-batch').value.trim();
-        const sPhone = document.getElementById('s-phone').value.trim();
-        const sWork = document.getElementById('s-work').value.trim();
-        const sIntern = document.getElementById('s-intern').value.trim();
-
-        if(!sName) return alert("กรุณากรอกชื่อรุ่นพี่");
+        if(!sName) return alert("กรุณากรอกชื่อผู้เข้าร่วมงาน");
         const btn = document.getElementById('save-btn');
-        btn.disabled = true;
-        btn.innerText = "กำลังบันทึก...";
+        btn.disabled = true; btn.innerText = "กำลังบันทึก...";
 
         const newSenior = {
-            name: sName, nickname: sNickname || "-", batch: sBatch || "-",
-            phone: sPhone || "-", work: sWork || "-", intern: sIntern || "-"
+            name: sName, nickname: document.getElementById('s-nickname').value || "-", 
+            batch: document.getElementById('s-batch').value || "-",
+            phone: document.getElementById('s-phone').value || "-", 
+            work: document.getElementById('s-work').value || "-", 
+            intern: document.getElementById('s-intern').value || "-"
         };
 
         const updatedSeniors = [...mySeniors, newSenior];
-
         db.ref('users/' + currentUser).set({
-            name: currentUser, batch: currentBatch,
-            seniors: updatedSeniors, count: updatedSeniors.length
+            name: currentUser, batch: currentBatch, seniors: updatedSeniors, count: updatedSeniors.length
         }).then(() => {
-            alert("บันทึกข้อมูลรุ่นพี่สำเร็จ!");
-            closeForm();
+            alert("บันทึกสำเร็จ!"); closeForm();
             document.querySelectorAll('#formModal input, #formModal textarea').forEach(el => el.value = "");
             btn.disabled = false; btn.innerText = "💾 บันทึกข้อมูล";
         });
@@ -230,87 +220,90 @@
     function showAdmin() {
         document.getElementById('login-section').style.display = 'none';
         document.getElementById('admin-section').style.display = 'block';
+        document.getElementById('excel-btn').style.display = 'block'; 
 
         db.ref('users').on('value', (snapshot) => {
             const listDiv = document.getElementById('all-users-list');
             const leaderboardBody = document.getElementById('leaderboard-body');
-            listDiv.innerHTML = "";
-            leaderboardBody.innerHTML = "";
-            
-            if(!snapshot.exists()) return listDiv.innerHTML = "<p>ยังไม่มีใครลงทะเบียน</p>";
+            listDiv.innerHTML = ""; leaderboardBody.innerHTML = "";
+            if(!snapshot.exists()) return;
             
             let allUsers = [];
-            snapshot.forEach((child) => {
-                allUsers.push(child.val());
-            });
-
-            // จัดอันดับตามจำนวน (Leaderboard)
+            snapshot.forEach((child) => { allUsers.push(child.val()); });
             let sortedUsers = [...allUsers].sort((a, b) => (b.count || 0) - (a.count || 0));
             sortedUsers.forEach((user, index) => {
-                let rankLabel = index + 1;
-                if(index === 0) rankLabel = "🥇";
-                if(index === 1) rankLabel = "🥈";
-                if(index === 2) rankLabel = "🥉";
-
-                const row = `<tr><td>${rankLabel}</td><td>${user.name}</td><td><b>${user.count || 0}</b></td></tr>`;
-                leaderboardBody.innerHTML += row;
+                let rank = index < 3 ? ["🥇","🥈","🥉"][index] : index + 1;
+                leaderboardBody.innerHTML += `<tr><td>${rank}</td><td>${user.name}</td><td><b>${user.count || 0}</b></td></tr>`;
             });
 
-            // รายชื่อทั้งหมดข้างล่าง
             allUsers.forEach((user) => {
                 const card = document.createElement('div');
                 card.className = 'admin-user-card';
                 card.innerHTML = `
-                    <div style="text-align:left">
-                        <b style="color:var(--navy-blue)">${user.name} (CE${user.batch})</b><br>
-                        <small style="color:var(--success-color)">รวบรวมได้: ${user.count || 0} คน</small>
-                    </div>
-                    <div>
-                        <button onclick="viewDetails('${user.name}')" style="background:var(--navy-blue); color:white; border-radius:8px; font-size:0.8rem; padding: 8px;">เปิดดู</button>
-                        <button onclick="deleteUser('${user.name}')" class="admin-del-btn">ลบ User</button>
-                    </div>
-                `;
+                    <div style="text-align:left"><b>${user.name} (CE${user.batch})</b><br><small>รวบรวมได้: ${user.count || 0}</small></div>
+                    <div><button onclick="viewDetails('${user.name}')" style="background:var(--navy-blue); color:white; padding:8px; border-radius:8px;">เปิดดูข้อมูล</button>
+                    <button onclick="deleteUser('${user.name}')" class="admin-del-btn">ลบ</button></div>`;
                 listDiv.appendChild(card);
             });
         });
     }
 
-    function deleteUser(userName) {
-        if(confirm(`ยืนยันการลบข้อมูลของ "${userName}" ทั้งหมดหรือไม่?`)) {
-            db.ref('users/' + userName).remove().then(() => alert("ลบ User เรียบร้อยแล้ว"));
-        }
-    }
-
-    function viewDetails(userName) {
-        db.ref('users/' + userName).once('value', (snapshot) => {
+    // --- ฟังก์ชันที่แก้ไขให้แสดงครบทุกฟิลด์ ---
+    function viewDetails(uName) {
+        db.ref('users/' + uName).once('value', (snapshot) => {
             const user = snapshot.val();
             if(!user || !user.seniors) return alert("ไม่พบข้อมูล");
-            document.getElementById('admin-view-title').innerText = "ข้อมูลของ " + userName;
-            const contentDiv = document.getElementById('admin-view-content');
-            contentDiv.innerHTML = "";
+            
+            document.getElementById('admin-view-title').innerText = "ข้อมูลโดย: " + uName;
+            const content = document.getElementById('admin-view-content');
+            content.innerHTML = "";
+
             user.seniors.forEach((s, i) => {
                 const item = document.createElement('div');
-                item.style.cssText = "border-bottom:1px solid #eee; padding:10px 0; position:relative;";
+                item.className = 'detail-box';
                 item.innerHTML = `
-                    <b>คนที่ ${i+1}: ${s.name} (CE${s.batch})</b><br>
-                    <small>เบอร์: ${s.phone} | ทำงาน: ${s.work}</small>
-                    <button onclick="deleteSeniorRow('${userName}', ${i})" style="position:absolute; right:0; top:10px; background:red; color:white; border-radius:5px; font-size:10px; padding:3px 8px;">ลบคนนี้</button>
+                    <div style="color:var(--orange-theme); font-weight:bold; margin-bottom:10px;">รุ่นพี่คนที่ ${i+1}</div>
+                    <div class="detail-row"><span class="detail-label">ชื่อ-นามสกุล:</span> ${s.name}</div>
+                    <div class="detail-row"><span class="detail-label">ชื่อเล่น:</span> ${s.nickname}</div>
+                    <div class="detail-row"><span class="detail-label">รุ่น:</span> ${s.batch}</div>
+                    <div class="detail-row"><span class="detail-label">เบอร์โทร:</span> ${s.phone}</div>
+                    <div class="detail-row"><span class="detail-label">ที่ทำงาน:</span> ${s.work}</div>
+                    <div class="detail-row"><span class="detail-label">รับเด็กฝึกงาน:</span> ${s.intern}</div>
+                    <button onclick="deleteSeniorRow('${uName}', ${i})" style="position:absolute; right:0; top:10px; background:var(--danger-red); color:white; border-radius:5px; font-size:10px; padding:5px;">ลบเฉพาะคนนี้</button>
                 `;
-                contentDiv.appendChild(item);
+                content.appendChild(item);
             });
             document.getElementById('adminDetailModal').style.display = 'flex';
         });
     }
 
-    function deleteSeniorRow(userName, index) {
-        if(confirm("ต้องการลบข้อมูลรุ่นพี่คนนี้ใช่หรือไม่?")) {
-            db.ref('users/' + userName).once('value', (snapshot) => {
-                const user = snapshot.val();
-                let seniors = user.seniors;
-                seniors.splice(index, 1);
-                db.ref('users/' + userName).update({ seniors: seniors, count: seniors.length }).then(() => {
-                    alert("ลบข้อมูลรุ่นพี่เรียบร้อย");
+    function exportToExcel() {
+        db.ref('users').once('value', (snapshot) => {
+            if (!snapshot.exists()) return alert("ไม่มีข้อมูล");
+            let data = [];
+            snapshot.forEach(uSnap => {
+                const u = uSnap.val();
+                if(u.seniors) u.seniors.forEach(s => {
+                    data.push({"ผู้กรอก": u.name, "ผู้กรอก(รุ่น)": u.batch, "ผู้เข้าร่วมงาน": s.name, "ชื่อเล่น": s.nickname, "ผู้เข้าร่วมงาน(รุ่น)": s.batch, "โทร": s.phone, "ที่ทำงาน": s.work, "ฝึกงาน": s.intern});
+                });
+            });
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data");
+            XLSX.writeFile(wb, "Meeting41_Full_Data.xlsx");
+        });
+    }
+
+    function deleteUser(u) { if(confirm(`ลบข้อมูลทั้งหมดของ ${u}?`)) db.ref('users/' + u).remove(); }
+
+    function deleteSeniorRow(u, i) {
+        if(confirm("ลบคนนี้ออกจากรายการ?")) {
+            db.ref('users/' + u).once('value', (s) => {
+                let user = s.val(); user.seniors.splice(i, 1);
+                db.ref('users/' + u).update({ seniors: user.seniors, count: user.seniors.length }).then(() => {
+                    // ปิด modal แล้วเปิดใหม่เพื่อรีเฟรชข้อมูล
                     closeAdminModal();
+                    if(user.seniors.length > 0) viewDetails(u);
                 });
             });
         }
@@ -318,5 +311,3 @@
 </script>
 </body>
 </html>
-
-
